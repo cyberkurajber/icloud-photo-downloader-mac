@@ -160,8 +160,9 @@ is the safe approach.
 - **Stop** — stops the current task. Already-downloaded files are kept; press Start to
   resume.
 - **Sign out** — clears the saved iCloud session (`~/.icloud_photo_downloader/session`)
-  so the next run asks for the password and 2FA again. Useful between customers. Your
-  downloaded photos are not touched.
+  **and** the customer's details (Apple ID, password, destination folder, album, dates;
+  Quick update is turned off). Use it between customers. General preferences such as
+  folder organization stay. Your downloaded photos are not touched.
 
 **Options**
 

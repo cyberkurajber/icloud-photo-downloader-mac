@@ -882,21 +882,32 @@ class App:
         self._launch(argv, pw, mode="download", dest=dest)
 
     def _on_signout(self):
-        if self.runner:
+        if self.runner or self._retry_job is not None:
             messagebox.showinfo(APP_TITLE, "Stop the current task before signing out.")
             return
         if not messagebox.askokcancel(
                 APP_TITLE,
-                "Clear the saved iCloud session?\n\nThe next run will ask for the "
-                "password and a 2FA code again. (Your downloaded photos are not touched.)"):
+                "Sign out and clear this customer's details?\n\n"
+                "This clears the saved iCloud session and the Apple ID, password, "
+                "destination folder, album and dates, and turns Quick update off -- "
+                "ready for the next customer.\n\n"
+                "Your downloaded photos are not touched."):
             return
         try:
             if os.path.isdir(SESSION_DIR):
                 shutil.rmtree(SESSION_DIR)
-            self.status_var.set("Signed out (saved session cleared)")
-            self._log_line("Saved session cleared.")
         except Exception as exc:
             messagebox.showerror(APP_TITLE, "Could not clear the session: %s" % exc)
+            return
+        # Customer-specific fields. General preferences (folder layout, options) stay.
+        for var in (self.email_var, self.pw_var, self.dir_var, self.album_var,
+                    self.from_var, self.to_var, self.extra_var):
+            var.set("")
+        self.quick_var.set(False)
+        self._update_free_space()
+        self._save_settings()
+        self.status_var.set("Signed out -- ready for the next customer")
+        self._log_line("Saved session and customer details cleared.")
 
     def _on_stop(self):
         if self._retry_job is not None:          # waiting to retry -> cancel it
