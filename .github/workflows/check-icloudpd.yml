@@ -1,0 +1,44 @@
+# Weekly reminder: opens an issue when a new icloudpd version is released,
+# so the app can be re-tested (Apple changes sign-in/iCloud APIs from time to time).
+# After testing, put the new version into ICLOUDPD_TESTED_VERSION and close the issue.
+name: Check for icloudpd updates
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"        # every Monday 08:00 UTC
+  workflow_dispatch: {}         # "Run workflow" button for a manual check
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare tested version with the latest on PyPI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tested="$(tr -d '[:space:]' < ICLOUDPD_TESTED_VERSION)"
+          latest="$(curl -fsSL https://pypi.org/pypi/icloudpd/json | jq -r .info.version)"
+          echo "tested=$tested latest=$latest"
+          if [ "$latest" = "$tested" ]; then
+            echo "Up to date."; exit 0
+          fi
+          title="Update check: icloudpd $latest is out (tested: $tested)"
+          if gh issue list --state open --search "in:title \"icloudpd $latest\"" --json number --jq 'length' | grep -qv '^0$'; then
+            echo "Issue already open."; exit 0
+          fi
+          gh issue create --title "$title" --body "A new icloudpd version was released: **$latest** (the app was last tested with **$tested**).
+
+          What to do:
+          1. Read the changelog: https://github.com/icloud-photos-downloader/icloud_photos_downloader/blob/master/CHANGELOG.md
+             Look for changes in sign-in / 2FA, removed or renamed options, and changed log messages.
+          2. Update locally: run \`bash install.sh\` again (it upgrades icloudpd).
+          3. Test: Sign in, Preview (count), and a short download.
+          4. If it all works, put \`$latest\` into \`ICLOUDPD_TESTED_VERSION\`, commit, and close this issue.
+             If the app needed changes, also publish a new Release with the updated zip."
