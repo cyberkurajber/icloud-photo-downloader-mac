@@ -1,0 +1,10 @@
+# local environment / build artifacts
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# distribution copies (the zip is attached to GitHub Releases instead)
+iCloud Photo Downloader/
+*.zip
+zijIlK3l
