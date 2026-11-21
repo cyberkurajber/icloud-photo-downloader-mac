@@ -217,6 +217,27 @@ def find_icloudpd():
     return shutil.which("icloudpd")
 
 
+KEYCHAIN_SERVICE = "pyicloud://icloud-password"   # where icloudpd's keyring saves passwords
+
+
+def remove_keychain_passwords(limit=200):
+    """Delete every iCloud password icloudpd stored in the login Keychain.
+    Returns how many were removed. Safe to call when there are none."""
+    removed = 0
+    if not shutil.which("security"):
+        return 0
+    for _ in range(limit):
+        try:
+            r = subprocess.run(["security", "delete-generic-password", "-s", KEYCHAIN_SERVICE],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        except Exception:
+            break
+        if r.returncode != 0:
+            break
+        removed += 1
+    return removed
+
+
 def human_bytes(n):
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if n < 1024 or unit == "TB":
@@ -754,7 +775,12 @@ class App:
         return email, self.pw_var.get(), dest
 
     def _common_args(self, email):
-        args = ["--username", email, "--cookie-directory", SESSION_DIR]
+        # "--password-provider console": take the password only from this app (typed
+        # into icloudpd's prompt). icloudpd's default also READS and WRITES the macOS
+        # Keychain, which would keep every customer's iCloud password on this Mac and
+        # could retry a stale saved password (a fast way to get an account locked).
+        args = ["--username", email, "--cookie-directory", SESSION_DIR,
+                "--password-provider", "console"]
         if self.adp_var.get():
             # icloudpd 1.33+: asks the Apple device to approve web access for ADP accounts
             args.append("--adp-web-access")
@@ -899,6 +925,10 @@ class App:
         except Exception as exc:
             messagebox.showerror(APP_TITLE, "Could not clear the session: %s" % exc)
             return
+        removed = remove_keychain_passwords()
+        if removed:
+            self._log_line("Removed %d iCloud password(s) saved in the Keychain by "
+                           "earlier icloudpd versions." % removed)
         # Customer-specific fields. General preferences (folder layout, options) stay.
         for var in (self.email_var, self.pw_var, self.dir_var, self.album_var,
                     self.from_var, self.to_var, self.extra_var):
